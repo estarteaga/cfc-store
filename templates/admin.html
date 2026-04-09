@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}- Inventario{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-box-seam"></i> Gestión de Inventario</h5>
+  <button class="btn btn-primary" onclick="abrirModalNuevo()">
+    <i class="bi bi-plus-lg"></i> Nuevo Producto
+  </button>
+</div>
+
+<!-- Filtros -->
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2">
+      <div class="col-md-5">
+        <input type="text" id="filtroNombre" class="form-control" placeholder="Buscar por nombre o código…" oninput="filtrar()">
+      </div>
+      <div class="col-md-3">
+        <select id="filtroCategoria" class="form-select" onchange="filtrar()">
+          <option value="">Todas las categorías</option>
+          <option>Biblias</option><option>Papelería</option>
+          <option>Vestuario</option><option>Accesorios</option><option>Oficina</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" onclick="limpiarFiltros()"><i class="bi bi-x-circle"></i> Limpiar</button>
+      </div>
+      <div class="col-md-2 text-end">
+        <span class="badge bg-secondary py-2 px-3" id="contadorProds">0 productos</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabla -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Código Barra</th>
+          <th>Categoría</th>
+          <th>Precio</th>
+          <th>Stock</th>
+          <th style="width:130px">Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tablaProductos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal crear/editar -->
+<div class="modal fade" id="modalProducto" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title" id="modalTitulo">Nuevo Producto</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="prodId">
+        <div class="mb-3">
+          <label class="form-label fw-bold">Nombre *</label>
+          <input type="text" id="prodNombre" class="form-control" placeholder="Ej: Biblia RVR60 Tapa Dura">
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Código de Barra <small class="text-muted">(opcional)</small></label>
+          <input type="text" id="prodCodigo" class="form-control" placeholder="EAN-13 (13 dígitos)">
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label fw-bold">Precio (CLP) *</label>
+            <input type="number" id="prodPrecio" class="form-control" min="0" placeholder="9990">
+          </div>
+          <div class="col-6">
+            <label class="form-label fw-bold">Stock *</label>
+            <input type="number" id="prodStock" class="form-control" min="0" placeholder="10">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">Categoría *</label>
+          <select id="prodCategoria" class="form-select">
+            <option>Biblias</option><option>Papelería</option>
+            <option>Vestuario</option><option>Accesorios</option><option>Oficina</option>
+          </select>
+        </div>
+        <div class="alert alert-danger d-none" id="errorModal"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarProducto()"><i class="bi bi-save"></i> Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal confirmar borrado -->
+<div class="modal fade" id="modalBorrar" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Eliminar producto</h5>
+        <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Eliminar <strong id="borrarNombre"></strong>?</p>
+        <small class="text-muted">Esta acción no se puede deshacer.</small>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-danger" onclick="confirmarBorrado()"><i class="bi bi-trash"></i> Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let todosProductos = [];
+let borrarId = null;
+
+const catColores = { Biblias:'primary', Papelería:'warning', Vestuario:'info', Accesorios:'success', Oficina:'secondary' };
+
+async function cargarProductos() {
+  const res = await fetch('/api/productos');
+  todosProductos = await res.json();
+  filtrar();
+}
+
+function filtrar() {
+  const q = document.getElementById('filtroNombre').value.toLowerCase().trim();
+  const cat = document.getElementById('filtroCategoria').value;
+  let lista = todosProductos.filter(p => {
+    const matchQ = !q || p.nombre.toLowerCase().includes(q) || (p.codigo_barra||'').includes(q);
+    const matchCat = !cat || p.categoria === cat;
+    return matchQ && matchCat;
+  });
+  document.getElementById('contadorProds').textContent = lista.length + ' producto' + (lista.length!==1?'s':'');
+  renderTabla(lista);
+}
+
+function limpiarFiltros() {
+  document.getElementById('filtroNombre').value = '';
+  document.getElementById('filtroCategoria').value = '';
+  filtrar();
+}
+
+function renderTabla(lista) {
+  const tbody = document.getElementById('tablaProductos');
+  if (lista.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Sin resultados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td><small class="text-muted">${p.id}</small></td>
+      <td><strong>${p.nombre}</strong></td>
+      <td><small class="font-monospace text-muted">${p.codigo_barra||'—'}</small></td>
+      <td><span class="badge bg-${catColores[p.categoria]||'secondary'} badge-categoria">${p.categoria}</span></td>
+      <td class="price">${clp(p.precio)}</td>
+      <td>
+        <span class="badge ${p.stock>5?'bg-success':p.stock>0?'bg-warning text-dark':'bg-danger'}">
+          ${p.stock} uds
+        </span>
+      </td>
+      <td>
+        <button class="btn btn-sm btn-outline-primary me-1" onclick="abrirModalEditar(${p.id})" title="Editar">
+          <i class="bi bi-pencil"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger" onclick="pedirBorrado(${p.id},'${p.nombre.replace(/'/g,"\\'")}')" title="Eliminar">
+          <i class="bi bi-trash"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+// ── Modal nuevo ───────────────────────────────────────────────────────────────
+function abrirModalNuevo() {
+  document.getElementById('modalTitulo').textContent = 'Nuevo Producto';
+  document.getElementById('prodId').value = '';
+  document.getElementById('prodNombre').value = '';
+  document.getElementById('prodCodigo').value = '';
+  document.getElementById('prodPrecio').value = '';
+  document.getElementById('prodStock').value = '';
+  document.getElementById('prodCategoria').value = 'Papelería';
+  document.getElementById('errorModal').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('modalProducto')).show();
+}
+
+function abrirModalEditar(id) {
+  const p = todosProductos.find(x=>x.id===id);
+  if (!p) return;
+  document.getElementById('modalTitulo').textContent = 'Editar Producto';
+  document.getElementById('prodId').value = p.id;
+  document.getElementById('prodNombre').value = p.nombre;
+  document.getElementById('prodCodigo').value = p.codigo_barra||'';
+  document.getElementById('prodPrecio').value = p.precio;
+  document.getElementById('prodStock').value = p.stock;
+  document.getElementById('prodCategoria').value = p.categoria;
+  document.getElementById('errorModal').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('modalProducto')).show();
+}
+
+async function guardarProducto() {
+  const id = document.getElementById('prodId').value;
+  const nombre = document.getElementById('prodNombre').value.trim();
+  const codigo = document.getElementById('prodCodigo').value.trim();
+  const precio = document.getElementById('prodPrecio').value;
+  const stock = document.getElementById('prodStock').value;
+  const categoria = document.getElementById('prodCategoria').value;
+  const errDiv = document.getElementById('errorModal');
+
+  if (!nombre || !precio || stock === '') {
+    errDiv.textContent = 'Nombre, precio y stock son obligatorios.';
+    errDiv.classList.remove('d-none'); return;
+  }
+  errDiv.classList.add('d-none');
+
+  const payload = { nombre, codigo_barra: codigo||null, precio: parseInt(precio), stock: parseInt(stock), categoria };
+  const url = id ? `/api/productos/${id}` : '/api/productos';
+  const method = id ? 'PUT' : 'POST';
+
+  const res = await fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  if (res.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('modalProducto')).hide();
+    cargarProductos();
+  } else {
+    const d = await res.json();
+    errDiv.textContent = d.error || 'Error al guardar';
+    errDiv.classList.remove('d-none');
+  }
+}
+
+// ── Borrado ───────────────────────────────────────────────────────────────────
+function pedirBorrado(id, nombre) {
+  borrarId = id;
+  document.getElementById('borrarNombre').textContent = nombre;
+  new bootstrap.Modal(document.getElementById('modalBorrar')).show();
+}
+
+async function confirmarBorrado() {
+  if (!borrarId) return;
+  await fetch(`/api/productos/${borrarId}`, { method:'DELETE' });
+  bootstrap.Modal.getInstance(document.getElementById('modalBorrar')).hide();
+  borrarId = null;
+  cargarProductos();
+}
+
+cargarProductos();
+</script>
+{% endblock %}

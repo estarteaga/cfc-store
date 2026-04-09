@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block title %}- Ventas{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  <!-- Columna izquierda: buscador + carrito -->
+  <div class="col-lg-7">
+
+    <!-- Buscador -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="input-group input-group-lg">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="text" id="buscarInput" class="form-control" placeholder="Buscar por nombre o código de barra…" autocomplete="off">
+          <button class="btn btn-primary" onclick="buscarProducto()"><i class="bi bi-plus-lg"></i> Agregar</button>
+        </div>
+        <div id="resultadosBusqueda" class="list-group mt-2" style="max-height:200px;overflow-y:auto;display:none;"></div>
+      </div>
+    </div>
+
+    <!-- Carrito -->
+    <div class="card">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cart3"></i> Carrito</span>
+        <button class="btn btn-sm btn-outline-light" onclick="limpiarCarrito()"><i class="bi bi-trash"></i> Limpiar</button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0" id="tablaCarrito">
+          <thead class="table-light">
+            <tr>
+              <th>Producto</th>
+              <th style="width:100px">Cant.</th>
+              <th style="width:120px">Precio</th>
+              <th style="width:120px">Subtotal</th>
+              <th style="width:50px"></th>
+            </tr>
+          </thead>
+          <tbody id="carritoBody">
+            <tr id="filaVacia"><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-cart-x fs-3"></i><br>Carrito vacío</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Totales y pago -->
+    <div class="card mt-3">
+      <div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Descuento ($)</label>
+            <input type="number" id="descuentoInput" class="form-control" value="0" min="0" oninput="calcularTotales()">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-bold">Método de pago</label>
+            <select id="metodoPago" class="form-select" onchange="toggleEfectivo()">
+              <option value="Efectivo">💵 Efectivo</option>
+              <option value="Transferencia">🏦 Transferencia</option>
+              <option value="Tarjeta">💳 Tarjeta</option>
+            </select>
+          </div>
+          <div class="col-md-4" id="bloqueEfectivo">
+            <label class="form-label small fw-bold">Monto recibido ($)</label>
+            <input type="number" id="montoRecibido" class="form-control" oninput="calcularVuelto()">
+          </div>
+        </div>
+
+        <div class="row mt-3">
+          <div class="col-6">
+            <div class="bg-light rounded p-3">
+              <div class="d-flex justify-content-between"><span>Subtotal:</span><strong id="lblSubtotal">$0</strong></div>
+              <div class="d-flex justify-content-between text-danger"><span>Descuento:</span><strong id="lblDescuento">-$0</strong></div>
+              <hr class="my-2">
+              <div class="d-flex justify-content-between fs-5"><span class="fw-bold">TOTAL:</span><strong id="lblTotal" class="price fs-4">$0</strong></div>
+              <div class="d-flex justify-content-between text-success mt-1" id="bloqueVuelto" style="display:none!important">
+                <span>Vuelto:</span><strong id="lblVuelto">$0</strong>
+              </div>
+            </div>
+          </div>
+          <div class="col-6 d-flex align-items-center">
+            <button class="btn btn-success btn-lg w-100 py-3" onclick="registrarVenta()">
+              <i class="bi bi-check-circle fs-4"></i><br>Cobrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Columna derecha: historial del día -->
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-receipt"></i> Ventas del día</span>
+        <span class="badge bg-warning text-dark" id="totalDiaBadge">$0</span>
+      </div>
+      <div class="card-body p-0" style="max-height:calc(100vh - 220px);overflow-y:auto;">
+        <div id="historialVentas" class="p-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal éxito -->
+<div class="modal fade" id="modalExito" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content text-center border-0">
+      <div class="modal-body py-4">
+        <div class="text-success fs-1"><i class="bi bi-check-circle-fill"></i></div>
+        <h5 class="mt-2">¡Venta registrada!</h5>
+        <p class="mb-1" id="exitoTotal"></p>
+        <p class="text-success fw-bold" id="exitoVuelto"></p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center">
+        <button class="btn btn-success px-4" data-bs-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let carrito = [];
+
+// ── Búsqueda ─────────────────────────────────────────────────────────────────
+document.getElementById('buscarInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') buscarProducto();
+});
+document.getElementById('buscarInput').addEventListener('input', async function() {
+  const q = this.value.trim();
+  const div = document.getElementById('resultadosBusqueda');
+  if (q.length < 2) { div.style.display = 'none'; return; }
+  const res = await fetch(`/api/productos?q=${encodeURIComponent(q)}`);
+  const prods = await res.json();
+  if (prods.length === 0) { div.style.display = 'none'; return; }
+  div.innerHTML = prods.map(p =>
+    `<button class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+      onclick="agregarAlCarrito(${p.id},'${p.nombre.replace(/'/g,"\\'")}',${p.precio},${p.stock})">
+      <span>${p.nombre} <small class="text-muted">${p.categoria}</small></span>
+      <span><strong class="price">${clp(p.precio)}</strong> <span class="badge ${p.stock>0?'bg-success':'bg-danger'}">${p.stock} uds</span></span>
+    </button>`
+  ).join('');
+  div.style.display = 'block';
+});
+
+async function buscarProducto() {
+  const q = document.getElementById('buscarInput').value.trim();
+  if (!q) return;
+  const res = await fetch(`/api/productos?q=${encodeURIComponent(q)}`);
+  const prods = await res.json();
+  if (prods.length === 1) {
+    const p = prods[0];
+    agregarAlCarrito(p.id, p.nombre, p.precio, p.stock);
+    document.getElementById('buscarInput').value = '';
+    document.getElementById('resultadosBusqueda').style.display = 'none';
+  }
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#buscarInput') && !e.target.closest('#resultadosBusqueda'))
+    document.getElementById('resultadosBusqueda').style.display = 'none';
+});
+
+// ── Carrito ───────────────────────────────────────────────────────────────────
+function agregarAlCarrito(id, nombre, precio, stock) {
+  document.getElementById('resultadosBusqueda').style.display = 'none';
+  document.getElementById('buscarInput').value = '';
+  if (stock <= 0) { alert('Sin stock disponible'); return; }
+  const idx = carrito.findIndex(i => i.id === id);
+  if (idx >= 0) {
+    if (carrito[idx].cantidad < stock) carrito[idx].cantidad++;
+    else { alert('No hay más stock disponible'); return; }
+  } else {
+    carrito.push({ id, nombre, precio, cantidad: 1, stock });
+  }
+  renderCarrito();
+}
+
+function cambiarCantidad(id, val) {
+  const idx = carrito.findIndex(i => i.id === id);
+  if (idx < 0) return;
+  const nueva = parseInt(val);
+  if (nueva < 1) { carrito.splice(idx, 1); }
+  else if (nueva > carrito[idx].stock) { alert('Stock máximo: ' + carrito[idx].stock); carrito[idx].cantidad = carrito[idx].stock; }
+  else { carrito[idx].cantidad = nueva; }
+  renderCarrito();
+}
+
+function quitarItem(id) {
+  carrito = carrito.filter(i => i.id !== id);
+  renderCarrito();
+}
+
+function limpiarCarrito() {
+  carrito = [];
+  renderCarrito();
+}
+
+function renderCarrito() {
+  const tbody = document.getElementById('carritoBody');
+  if (carrito.length === 0) {
+    tbody.innerHTML = '<tr id="filaVacia"><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-cart-x fs-3"></i><br>Carrito vacío</td></tr>';
+  } else {
+    tbody.innerHTML = carrito.map(item => `
+      <tr>
+        <td><small>${item.nombre}</small></td>
+        <td><input type="number" class="form-control form-control-sm" value="${item.cantidad}" min="1" max="${item.stock}"
+          onchange="cambiarCantidad(${item.id}, this.value)" style="width:70px"></td>
+        <td class="price small">${clp(item.precio)}</td>
+        <td class="price small">${clp(item.precio * item.cantidad)}</td>
+        <td><button class="btn btn-sm btn-outline-danger" onclick="quitarItem(${item.id})"><i class="bi bi-x"></i></button></td>
+      </tr>`).join('');
+  }
+  calcularTotales();
+}
+
+function calcularTotales() {
+  const subtotal = carrito.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const descuento = parseInt(document.getElementById('descuentoInput').value) || 0;
+  const total = Math.max(0, subtotal - descuento);
+  document.getElementById('lblSubtotal').textContent = clp(subtotal);
+  document.getElementById('lblDescuento').textContent = '-' + clp(descuento);
+  document.getElementById('lblTotal').textContent = clp(total);
+  document.getElementById('montoRecibido').min = total;
+  calcularVuelto();
+}
+
+function calcularVuelto() {
+  const total = Math.max(0, carrito.reduce((s,i)=>s+i.precio*i.cantidad,0) - (parseInt(document.getElementById('descuentoInput').value)||0));
+  const recibido = parseInt(document.getElementById('montoRecibido').value) || 0;
+  const bloqueVuelto = document.getElementById('bloqueVuelto');
+  if (document.getElementById('metodoPago').value === 'Efectivo') {
+    const vuelto = recibido - total;
+    document.getElementById('lblVuelto').textContent = clp(Math.max(0, vuelto));
+    bloqueVuelto.style.display = vuelto >= 0 ? '' : 'none';
+    bloqueVuelto.style.removeProperty('display');
+    if (vuelto < 0) bloqueVuelto.style.display = 'none';
+  } else {
+    bloqueVuelto.style.display = 'none';
+  }
+}
+
+function toggleEfectivo() {
+  const es = document.getElementById('metodoPago').value === 'Efectivo';
+  document.getElementById('bloqueEfectivo').style.display = es ? '' : 'none';
+}
+
+// ── Registrar venta ───────────────────────────────────────────────────────────
+async function registrarVenta() {
+  if (carrito.length === 0) { alert('El carrito está vacío'); return; }
+  const subtotal = carrito.reduce((s,i)=>s+i.precio*i.cantidad,0);
+  const descuento = parseInt(document.getElementById('descuentoInput').value)||0;
+  const total = Math.max(0, subtotal - descuento);
+  const metodo = document.getElementById('metodoPago').value;
+  const recibido = metodo==='Efectivo' ? parseInt(document.getElementById('montoRecibido').value)||total : total;
+  if (metodo==='Efectivo' && recibido < total) { alert('Monto recibido menor al total'); return; }
+
+  const payload = {
+    items: carrito.map(i => ({ id:i.id, nombre:i.nombre, precio:i.precio, cantidad:i.cantidad })),
+    total, descuento, metodo_pago: metodo, monto_recibido: recibido
+  };
+
+  const res = await fetch('/api/ventas', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (!res.ok) { alert('Error: ' + data.error); return; }
+
+  document.getElementById('exitoTotal').textContent = 'Total: ' + clp(total) + ' — ' + metodo;
+  const vueltoEl = document.getElementById('exitoVuelto');
+  if (metodo==='Efectivo' && data.vuelto > 0)
+    vueltoEl.textContent = 'Vuelto: ' + clp(data.vuelto);
+  else vueltoEl.textContent = '';
+
+  new bootstrap.Modal(document.getElementById('modalExito')).show();
+  limpiarCarrito();
+  document.getElementById('descuentoInput').value = 0;
+  document.getElementById('montoRecibido').value = '';
+  cargarHistorial();
+}
+
+// ── Historial ─────────────────────────────────────────────────────────────────
+const colores = { Efectivo:'success', Transferencia:'primary', Tarjeta:'info' };
+
+async function cargarHistorial() {
+  const res = await fetch('/api/ventas/hoy');
+  const ventas = await res.json();
+  const totalDia = ventas.reduce((s,v)=>s+v.total,0);
+  document.getElementById('totalDiaBadge').textContent = clp(totalDia);
+  const div = document.getElementById('historialVentas');
+  if (ventas.length===0) { div.innerHTML='<p class="text-muted text-center mt-4">Sin ventas hoy</p>'; return; }
+  div.innerHTML = ventas.map(v => `
+    <div class="border rounded p-2 mb-2 bg-white">
+      <div class="d-flex justify-content-between align-items-start">
+        <small class="text-muted">${v.fecha.substring(11,16)} — #${v.id}</small>
+        <span class="badge bg-${colores[v.metodo_pago]||'secondary'}">${v.metodo_pago}</span>
+      </div>
+      <div class="small mt-1 text-muted">${v.detalle||''}</div>
+      <div class="text-end price">${clp(v.total)}</div>
+    </div>`).join('');
+}
+
+cargarHistorial();
+toggleEfectivo();
+</script>
+{% endblock %}

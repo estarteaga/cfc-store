@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block title %}- Dashboard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-bar-chart-line"></i> Dashboard de Ventas</h5>
+  <div class="d-flex align-items-center gap-2">
+    <input type="date" id="fechaSelector" class="form-control" style="width:180px">
+    <button class="btn btn-primary" onclick="cargarDashboard()"><i class="bi bi-search"></i> Ver</button>
+    <button class="btn btn-outline-secondary" onclick="irHoy()"><i class="bi bi-calendar-day"></i> Hoy</button>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-4">
+        <div class="fs-1 text-primary"><i class="bi bi-cash-stack"></i></div>
+        <div class="fs-4 fw-bold price mt-1" id="kpiTotal">$0</div>
+        <div class="text-muted small">Total vendido</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-4">
+        <div class="fs-1 text-success"><i class="bi bi-receipt-cutoff"></i></div>
+        <div class="fs-4 fw-bold mt-1" id="kpiTransacciones">0</div>
+        <div class="text-muted small">Transacciones</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-4">
+        <div class="fs-1 text-warning"><i class="bi bi-graph-up-arrow"></i></div>
+        <div class="fs-4 fw-bold price mt-1" id="kpiTicket">$0</div>
+        <div class="text-muted small">Ticket promedio</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card h-100">
+      <div class="card-body text-center py-4">
+        <div class="fs-1 text-info"><i class="bi bi-star-fill"></i></div>
+        <div class="fw-bold mt-1" id="kpiTopProd" style="font-size:.95rem;min-height:2.5rem">—</div>
+        <div class="text-muted small">Producto más vendido</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Métodos de pago -->
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card border-0" style="background:linear-gradient(135deg,#198754,#28a745)">
+      <div class="card-body text-white d-flex align-items-center gap-3">
+        <div class="fs-2"><i class="bi bi-cash"></i></div>
+        <div>
+          <div class="small opacity-75">Efectivo</div>
+          <div class="fs-5 fw-bold" id="kpiEfectivo">$0</div>
+          <div class="small opacity-75" id="kpiEfectivoCant">0 ventas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0" style="background:linear-gradient(135deg,#0d6efd,#0a58ca)">
+      <div class="card-body text-white d-flex align-items-center gap-3">
+        <div class="fs-2"><i class="bi bi-bank"></i></div>
+        <div>
+          <div class="small opacity-75">Transferencia</div>
+          <div class="fs-5 fw-bold" id="kpiTransferencia">$0</div>
+          <div class="small opacity-75" id="kpiTransferenciaCant">0 ventas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card border-0" style="background:linear-gradient(135deg,#0dcaf0,#0aa2c0)">
+      <div class="card-body text-white d-flex align-items-center gap-3">
+        <div class="fs-2"><i class="bi bi-credit-card"></i></div>
+        <div>
+          <div class="small opacity-75">Tarjeta</div>
+          <div class="fs-5 fw-bold" id="kpiTarjeta">$0</div>
+          <div class="small opacity-75" id="kpiTarjetaCant">0 ventas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabla últimas ventas -->
+<div class="card">
+  <div class="card-header bg-dark text-white"><i class="bi bi-clock-history"></i> Últimas 10 ventas del día</div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Hora</th><th>Detalle</th><th>Método</th><th>Total</th>
+        </tr>
+      </thead>
+      <tbody id="tablaVentas">
+        <tr><td colspan="5" class="text-center text-muted py-4">Sin ventas para esta fecha</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const metodoColor = { Efectivo:'success', Transferencia:'primary', Tarjeta:'info' };
+
+function irHoy() {
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('fechaSelector').value = hoy;
+  cargarDashboard();
+}
+
+async function cargarDashboard() {
+  const fecha = document.getElementById('fechaSelector').value;
+  const res = await fetch(`/api/dashboard?fecha=${fecha}`);
+  const d = await res.json();
+
+  document.getElementById('kpiTotal').textContent = clp(d.total_dia);
+  document.getElementById('kpiTransacciones').textContent = d.transacciones;
+  document.getElementById('kpiTicket').textContent = clp(d.ticket_promedio);
+
+  const top = d.top_producto;
+  document.getElementById('kpiTopProd').textContent = top ? `${top.nombre_producto} (${top.total_cant} uds)` : '—';
+
+  const ef = d.por_metodo['Efectivo']||{suma:0,cant:0};
+  const tr = d.por_metodo['Transferencia']||{suma:0,cant:0};
+  const ta = d.por_metodo['Tarjeta']||{suma:0,cant:0};
+
+  document.getElementById('kpiEfectivo').textContent = clp(ef.suma);
+  document.getElementById('kpiEfectivoCant').textContent = ef.cant + ' venta' + (ef.cant!==1?'s':'');
+  document.getElementById('kpiTransferencia').textContent = clp(tr.suma);
+  document.getElementById('kpiTransferenciaCant').textContent = tr.cant + ' venta' + (tr.cant!==1?'s':'');
+  document.getElementById('kpiTarjeta').textContent = clp(ta.suma);
+  document.getElementById('kpiTarjetaCant').textContent = ta.cant + ' venta' + (ta.cant!==1?'s':'');
+
+  const tbody = document.getElementById('tablaVentas');
+  if (d.ultimas_ventas.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Sin ventas para esta fecha</td></tr>';
+  } else {
+    tbody.innerHTML = d.ultimas_ventas.map(v => `
+      <tr>
+        <td><small class="text-muted">#${v.id}</small></td>
+        <td><small>${v.fecha.substring(11,16)}</small></td>
+        <td><small>${v.detalle||'—'}</small></td>
+        <td><span class="badge bg-${metodoColor[v.metodo_pago]||'secondary'}">${v.metodo_pago}</span></td>
+        <td class="price">${clp(v.total)}</td>
+      </tr>`).join('');
+  }
+}
+
+irHoy();
+</script>
+{% endblock %}

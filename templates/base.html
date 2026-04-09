@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CFC Store {% block title %}{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --cfc-primary: #1a3a5c;
+      --cfc-accent:  #e8a020;
+      --cfc-light:   #f4f7fb;
+    }
+    body { background: var(--cfc-light); font-family: 'Segoe UI', sans-serif; }
+    .navbar-cfc { background: var(--cfc-primary); }
+    .navbar-cfc .navbar-brand { color: var(--cfc-accent) !important; font-weight: 700; font-size: 1.4rem; letter-spacing: 1px; }
+    .navbar-cfc .nav-link { color: #cde !important; font-weight: 500; }
+    .navbar-cfc .nav-link.active, .navbar-cfc .nav-link:hover { color: var(--cfc-accent) !important; }
+    .nav-icon { font-size: 1.1rem; margin-right: 5px; }
+    .card { border: none; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
+    .card-header { border-radius: 12px 12px 0 0 !important; }
+    .btn-primary { background: var(--cfc-primary); border-color: var(--cfc-primary); }
+    .btn-primary:hover { background: #14304d; border-color: #14304d; }
+    .badge-categoria { font-size: .75rem; }
+    .price { font-weight: 700; color: var(--cfc-primary); }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-cfc mb-4">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><i class="bi bi-shop"></i> CFC Store</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-3 gap-1">
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='ventas' %}active{% endif %}" href="/ventas">
+            <i class="bi bi-cart3 nav-icon"></i>Ventas
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='admin' %}active{% endif %}" href="/admin">
+            <i class="bi bi-box-seam nav-icon"></i>Inventario
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}" href="/dashboard">
+            <i class="bi bi-bar-chart-line nav-icon"></i>Dashboard
+          </a>
+        </li>
+      </ul>
+      <span class="ms-auto text-white-50 small" id="reloj"></span>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4">
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Reloj en navbar
+  function actualizarReloj() {
+    const ahora = new Date();
+    document.getElementById('reloj').textContent = ahora.toLocaleString('es-CL');
+  }
+  setInterval(actualizarReloj, 1000);
+  actualizarReloj();
+
+  // Formato CLP
+  function clp(n) {
+    return '$' + Math.round(n).toLocaleString('es-CL');
+  }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
